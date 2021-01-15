@@ -55,7 +55,8 @@ pub struct Fun {
     pub body:  Box<Expr>,
 }
 
-// impl Fun {
+impl Fun {
+    
 //     // pub fn call(&self, args: Vector<Expr>, eval: &mut Eval) -> Result<Expr, EvalError> {
 //     //     self.assign_args(args)?;
 //     //     unimplemented!()
@@ -72,7 +73,7 @@ pub struct Fun {
 //             }
 //         }
 //     }
-// }
+}
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Int {
