@@ -1,10 +1,12 @@
 use crate::spans::*;
+use crate::eval::*;
+use std::mem::swap;
 use im::{HashMap, Vector};
 
 #[derive(Clone, Default, Eq, Hash, PartialEq)]
 pub struct Meta {
     pub span: Option<Span>,
-    pub old: Option<Box<Meta>>,
+    pub old:  Option<Box<Meta>>,
 }
 
 impl Meta {
@@ -21,58 +23,64 @@ impl From<Span> for Meta {
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum Special {
+    // CallWithCurrentContinuation(Meta),
     Lambda(Meta),
-    Let(Meta),
-    Match(Meta),
+    // Match(Meta),
     Quasiquote(Meta),
     Quote(Meta),
     The(Meta),
     Unquote(Meta),
+    // UnquoteSplicing(Meta),
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub enum Builtin {
-    List(Meta),
-    Map(Meta),
-}
+impl Special {
+    pub fn meta(&self) -> &Meta {
+        match self {
+            Special::Lambda(m) => &m,
+            Special::Quasiquote(m) => &m,
+            Special::Quote(m) => &m,
+            Special::The(m) => &m,
+            Special::Unquote(m) => &m,
+        }
+    }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Param {
-    pub name: String,
-}
-
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub enum FunKind {
-    Function,
-    Macro,
-    Fexpr,
+    // Rust doesn't permit us to return mutable refs to values in an
+    // enum and we can't be arsed to use proxy objects, so we do the
+    // next best thing and have a setter.
+    pub fn set_meta(&mut self, mut meta: Meta) -> Meta {
+        match self {
+            Special::Lambda(ref mut m) => swap(m, &mut meta),
+            Special::Quasiquote(ref mut m) => swap(m, &mut meta),
+            Special::Quote(ref mut m) => swap(m, &mut meta),
+            Special::The(ref mut m) => swap(m, &mut meta),
+            Special::Unquote(ref mut m) => swap(m, &mut meta),
+        };
+        meta
+    }
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Fun {
-    pub kind:  FunKind,
-    pub param: Param,
+    pub param: Box<Symbol>,
     pub body:  Box<Expr>,
+    pub meta:  Meta,
 }
 
 impl Fun {
     
-//     // pub fn call(&self, args: Vector<Expr>, eval: &mut Eval) -> Result<Expr, EvalError> {
-//     //     self.assign_args(args)?;
-//     //     unimplemented!()
-//     // }
-//     fn assign_args(&self, args: Vector<Expr>) -> Result<(), EvalError> {
-//         let mut params = self.params.iter();
-//         let mut args = args.into_iter();
-//         loop {
-//             match (params.next(), args.next()) {
-//                 (None, None) => { return Ok(()); }
-//                 (None, Some(arg)) => {}
-//                 (Some(param), None) => {}
-//                 (Some(param), Some(arg)) => {}
-//             }
-//         }
-//     }
+    pub fn new(param: Box<Symbol>, body:  Box<Expr>, meta:  Meta)  -> Fun {
+        Fun { param, body, meta }
+    }
+
+
+    pub fn call(&self, arg: Expr, eval: &mut Eval) -> Result<Expr, EvalError> {
+        let mut fval = eval.clone();
+        fval.stack.push();
+        fval.stack.assign(&self.param.value, arg);
+        let result = fval.eval(*self.body.clone())?;
+        Ok(result)
+    }
+
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -111,7 +119,7 @@ impl From<String> for Symbol {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
 pub struct List {
     pub vals: Vector<Expr>,
     pub meta: Meta,
@@ -157,5 +165,41 @@ pub enum Expr {
     List(List),
     Map(Map),
     Fun(Fun),
+    Macro(Fun),
     Special(Special),
+    // Continuation(Stack),
+}
+
+impl Expr {
+    pub fn meta(&self) -> Option<&Meta> {
+        match self {
+            Expr::Nil => None,
+            Expr::Int(e) => Some(&e.meta),
+            Expr::Symbol(e) => Some(&e.meta),
+            Expr::List(e) => Some(&e.meta),
+            Expr::Map(e) => Some(&e.meta),
+            Expr::Fun(e) => Some(&e.meta),
+            Expr::Macro(e) => Some(&e.meta),
+            Expr::Special(e) => Some(e.meta()),
+        }
+    }
+    pub fn set_meta(&mut self, mut meta: Meta) -> Option<Meta> {
+        match self {
+            Expr::Nil => return None,
+            Expr::Int(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::Symbol(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::List(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::Map(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::Fun(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::Macro(ref mut e) => swap(&mut e.meta, &mut meta),
+            Expr::Special(ref mut e) => return Some(e.set_meta(meta)),
+        };
+        Some(meta)
+    }
+}
+
+impl Default for Expr {
+    fn default() -> Expr {
+        Expr::Nil
+    }
 }
