@@ -1,6 +1,5 @@
 use crate::spans::*;
 // use ordered_float::OrderedFloat;
-use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::hash::Hash;
 
@@ -53,6 +52,7 @@ impl TryFrom<char> for Paren {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Prefix {
     HasType,
+    Lambda,
     Quasiquote,
     Quote,
     Unquote,
@@ -62,11 +62,12 @@ impl TryFrom<char> for Prefix {
     type Error = ();
     fn try_from(ch: char) -> Result<Self, ()> {
         match ch {
-            ':' => Ok(Prefix::HasType),
-            ')' => Ok(Prefix::Quasiquote),
-            '{' => Ok(Prefix::Quote),
-            '}' => Ok(Prefix::Unquote),
-            _ => Err(()),
+            '\\' => Ok(Prefix::Lambda),
+            ':'  => Ok(Prefix::HasType),
+            ')'  => Ok(Prefix::Quasiquote),
+            '{'  => Ok(Prefix::Quote),
+            '}'  => Ok(Prefix::Unquote),
+            _    => Err(()),
         }
     }
 }
@@ -81,7 +82,7 @@ impl TryFrom<char> for Prefix {
 // #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 // pub enum StringToken<'a> {
 //     Delimiter,
-//     Text(Cow<'a, str>),
+//     Text(&'a str),
 //     Escape(StringEscape),
 // }
 
@@ -99,7 +100,7 @@ impl TryFrom<char> for Prefix {
 pub enum Literal<'a> {
     Int(i64),
     // Float(OrderedFloat<f64>),
-    Symbol(Cow<'a, str>),
+    Symbol(&'a str),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -109,7 +110,7 @@ pub enum Token<'a> {
     Close(Paren),
     Prefix(Prefix),
     // String(StringToken<'a>)
-    Whitespace(Cow<'a, str>),
+    Whitespace(&'a str),
 }
 
 impl<'a> Token<'a> {
@@ -224,7 +225,7 @@ impl<'a> Tokens<'a> {
             }
         }
     }
-
+    // TODO: dots between indicates an accessor
     fn parse_symbol(&mut self) -> Spanning<Token<'a>> {
         match self.source.find(is_symbol) {
             Some(index) => {
@@ -293,7 +294,7 @@ fn is_close(ch: char) -> bool {
 }
 
 fn is_prefix(ch: char) -> bool {
-    ":`'~".chars().any(|dh| ch == dh)
+    "\\:`'~".chars().any(|dh| ch == dh)
 }
 
 fn is_symbol(ch: char) -> bool {

@@ -36,6 +36,28 @@ We will be experimenting with syntax a lot. We're currently considering:
 \x \y (+ x y)
 ```
 
+## Experiments
+
+### First class special forms
+
+In a typical lisp, use of a special form is identified when a symbol
+naming a special form appears in call position in a list. The special
+form does not really exist as data, we just have a means of
+identifying when the user is attempting to use one.
+
+We're attempting to make special forms first class. Instead of this
+special casing, we will make special forms normal symbols which
+evaluate to a proxy for the special form. In essence, they become
+lambda-like objects.
+
+I'm not sure of how much use this will be, but i've always wondered
+about how it would turn out. It's proving quite painful to implement.
+
+```lisp
+(lambda x x) ; simple case, easy to substitute
+(let [x lambda] (x x x)) ; needs partial eval
+```
+
 ## Copyright and License
 
 Copyright (c) 2021 James Laver, pangolisp contributors

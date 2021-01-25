@@ -1,9 +1,37 @@
-pub mod spans;
-pub mod tokens;
-pub mod forms;
-pub mod exprs;
-pub mod reader;
-pub mod eval;
+#[macro_use]
+extern crate slog;
+
+pub mod compactor; // string interning
+pub mod spans; // positions for tokens
+pub mod tokens; // tokenisation
+pub mod parser; // parsing
+pub mod exprs; // the everything after parsing type
+pub mod lists;
+// pub mod forms;
+// pub mod exprs;
+// pub mod eval;
+pub mod stack;
+
+// pub mod vm;
+
+use compactor::*;
+use spans::*;
+
+#[derive(Debug, Default, Hash)]
+struct Fresh(usize);
+
+impl Fresh {
+    #[inline(always)]
+    pub fn next(&mut self) -> usize {
+        self.0 += 1;
+        self.0
+    }
+}
+
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
+pub struct Meta {
+    pub defined_at: Option<Span>,
+}
 
 // #[derive(Clone, Eq, PartialEq)]
 // pub enum Kind {
@@ -14,7 +42,7 @@ pub mod eval;
 // pub mod types {
 //     use super::*;
 //     pub fn unit() -> Type {
-//         TypeConstructor::new("()", Kind::Star).into()
+//         TypeConstructor::new("()", Kind::Star).into
 //     }
 // }
 
